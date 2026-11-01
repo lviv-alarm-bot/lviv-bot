@@ -1,70 +1,79 @@
 import time
 import requests
 import threading
+import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 TOKEN = "9257983302:AAGYlPVE18uIAkwbNeOvDZ0_uQ3L-I77Yss"
 CHANNEL_ID = "@yoy_lviv_monitor" 
-REGION_ID = "14" 
 
-# Використовуємо стабільне API мапи тривог
-API_URL = "https://ubilling.net.ua/aerialalerts/?json=true"
+# Джерело оперативної інформації Повітряних Сил ЗСУ (дзеркало у форматі RSS)
+PS_API_URL = "https://i-scuba.com"
 
-# --- СТВОРЕННЯ МІНІ-САЙТУ ДЛЯ ОБХОДУ СНУ ---
+# --- ВЕБ-СЕРВЕР ДЛЯ ОБХОДУ СНУ НА RENDER ---
 class WebServerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"Bot is alive and working!")
+        self.wfile.write(b"Bot is active and monitoring airspace!")
 
 def run_web_server():
-    # Render автоматично дає порт у змінній оточення PORT, або використовуємо 8080
     import os
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), WebServerHandler)
-    print(f"Веб-сервер для утримання активності запущено на порту {port}")
     server.serve_forever()
 
-# --- ОСНОВНА ЛОГІКА БОТА ---
-def check_alarm():
-    last_state = None
-    print("Моніторинг загроз активовано...")
+# --- ЛОГІКА МОНІТОРУ НАПРЯМКУ ДРОНІВ ТА РАКЕТ ---
+def check_airspace_details():
+    last_processed_guid = None
+    print("Розумний моніторинг курсу БПЛА та Ракет для Львівщини активовано...")
+    
+    # Ключові слова для фільтрації новин саме по нашому регіону
+    keywords = ["львів", "львівщин", "стрий", "золочів", "червоноград", "самбір", "броди", "яворів", "західн", "заходу"]
     
     while True:
         try:
-            response = requests.get(API_URL, timeout=10)
+            response = requests.get(PS_API_URL, timeout=15)
             if response.status_code == 200:
-                data = response.json()
-                is_active = REGION_ID in data
+                root = ET.fromstring(response.content)
+                latest_item = root.find(".//item")
                 
-                if last_state is not None and is_active != last_state:
-                    if is_active:
-                        text = "🚨 **ПОВІТРЯНА TРИВОГА У ЛЬВІВСЬКІЙ ОБЛАСТІ!**\n\n⚠️ Зафіксовано загрозу! Перейдіть в укриття. Можливий рух ракет або ворожих БПЛА (дронів)."
-                    else:
-                        text = "🟢 **ВІДБІЙ ПОВІТРЯНОЇ TРИВОГИ у Львівській області.**\n\nНебезпека минула. Дякуємо Силам ППО!"
+                if latest_item is not None:
+                    guid = latest_item.find("guid").text
+                    title = latest_item.find("title").text
+                    # Отримуємо повний текст повідомлення
+                    description = latest_item.find("description").text if latest_item.find("description") is not None else title
                     
-                    send_url = f"https://telegram.org{TOKEN}/sendMessage"
-                    requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": text, "parse_mode": "Markdown"})
-                
-                last_state = is_active
-                print("Статус успішно перевірено, загрози:", "ТАК" if is_active else "НІ")
+                    if last_processed_guid is not None and guid != last_processed_guid:
+                        text_to_check = description.lower()
+                        
+                        # Перевіряємо, чи стосується свіжа оперативка Львівської області
+                        if any(word in text_to_check for word in keywords):
+                            # Формуємо красивий пост із напрямком руху цілей
+                            bot_text = f"⚠️ **ОПЕРАТИВНА ІНФОРМАЦІЯ ПРО РУХ ЦІЛЕЙ:**\n\n📌 {description}\n\n🚨 *Будьте уважні, загроза безпосередньо для нашого регіону!*"
+                            
+                            send_url = f"https://telegram.org{TOKEN}/sendMessage"
+                            requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML"})
+                            print(f"Опубліковано оперативну інформацію: {title}")
+                    
+                    last_processed_guid = guid
         except Exception as e:
-            print(f"Помилка мережі: {e}")
+            print(f"Помилка оновлення даних ПС ЗСУ: {e}")
             
-        time.sleep(15) # Перевірка кожні 15 секунд
+        time.sleep(20) # Перевірка кожні 20 секунд (оперативно для БПЛА)
 
 if __name__ == "__main__":
-    # Запускаємо веб-сайт в окремому потоці, щоб він не заважав боту перевіряти тривоги
+    # Запуск веб-сайту-будильника
     web_thread = threading.Thread(target=run_web_server)
     web_thread.daemon = True
     web_thread.start()
     
-    # Тестове повідомлення для перевірки каналу:
+    # Тестове повідомлення в канал про успішне оновлення системи
     try:
-        requests.post(f"https://telegram.org", json={"chat_id": "@yoy_lviv_monitor", "text": "🚀 **Моніторинг успішно підключено!**\n\nБот @moya_tryvoga_lviv_bot перейшов у режим цілодобового чергування. Система готова сповіщати про тривоги та відбої на Львівщині.", "parse_mode": "Markdown"})
-    except Exception as e:
-        print(f"Помилка тесту: {e}")
-    
-    # Запускаємо самого бота
-    check_alarm()
+        requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": "🔄 **Систему моніторингу оновлено!**\n\nТепер бот автоматично відстежуватиме напрямок руху Шахедів/Ракет та публікуватиме деталі, як тільки вони з'являться на підльоті до Львівщини.", "parse_mode": "Markdown"})
+    except:
+        pass
+        
+    # Запуск розумного моніторингу
+    check_airspace_details()
