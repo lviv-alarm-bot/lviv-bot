@@ -10,14 +10,16 @@ CHANNEL_ID = "@yoy_lviv_monitor"
 
 # ДЖЕРЕЛА ДАНИХ
 PS_API_URL = "https://i-scuba.com" # Повітряні Сили
-LVIV_NEWS_URL = "https://google.com" # Новини Львова
+# Спеціальні пошукові стрічки для Львова (Погода, Світло, Транспорт)
+WEATHER_URL = "https://google.com"
+OBLENERGO_URL = "https://google.com"
 
 class WebServerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"Bot is active!")
+        self.wfile.write(b"Bot is active and running multiple streams!")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
@@ -53,54 +55,59 @@ def check_airspace_details():
             print(f"Помилка ПС ЗСУ: {e}")
         time.sleep(20)
 
-# 2. МОНІТОРИНГ МІСЬКИХ НОВИН
-def check_lviv_news():
-    last_news_title = None
-    news_keywords = ["світл", "вод", "відключен", "дтп", "аварі", "транспорт", "опален", "рух"]
+# 2. АВТОМАТИЧНА ПОГОДА ТА СВІТЛО (Прості побутові новини)
+def check_daily_utility_info():
+    last_weather_title = None
+    last_light_title = None
     
     while True:
         try:
             if not TOKEN:
                 time.sleep(10)
                 continue
-            response = requests.get(LVIV_NEWS_URL, timeout=15)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                latest_item = root.find(".//item")
-                if latest_item is not None:
-                    title = latest_item.find("title").text
-                    
-                    if last_news_title is not None and title != last_news_title:
-                        title_lower = title.lower()
-                        if any(word in title_lower for word in news_keywords):
-                            clean_title = title.split(" - ")
-                            news_text = f"📰 <b>НОВИНИ ЛЬВОВА | ОПЕРАТИВНО</b>\n\n📌 {clean_title}\n\n📢 <i>Поділіться інформацією з близькими!</i>"
-                            send_url = f"https://telegram.org{TOKEN}/sendMessage"
-                            requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
-                    last_news_title = title
+                
+            # Перевірка погоди у Львові
+            weather_res = requests.get(WEATHER_URL, timeout=15)
+            if weather_res.status_code == 200:
+                w_root = ET.fromstring(weather_res.content)
+                w_item = w_root.find(".//item")
+                if w_item is not None:
+                    w_title = w_item.find("title").text
+                    if last_weather_title is not None and w_title != last_weather_title:
+                        w_clean = w_title.split(" - ")[0]
+                        bot_text = f"🌤 <b>ПОГОДА У ЛЬВОВІ | СВІЖИЙ ПРОГНОЗ</b>\n\n📌 {w_clean}\n\n🤖 <i>Вдалих та безпечних вам справ!</i>"
+                        send_url = f"https://telegram.org{TOKEN}/sendMessage"
+                        requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML"})
+                    last_weather_title = w_title
+
+            # Перевірка щоденних новин про світло від Львівобленерго
+            light_res = requests.get(OBLENERGO_URL, timeout=15)
+            if light_res.status_code == 200:
+                l_root = ET.fromstring(light_res.content)
+                l_item = l_root.find(".//item")
+                if l_item is not None:
+                    l_title = l_item.find("title").text
+                    if last_light_title is not None and l_title != last_light_title:
+                        l_clean = l_title.split(" - ")[0]
+                        bot_text = f"💡 <b>ЕНЕРГЕТИКА | ЛЬВІВОБЛЕНЕРГО</b>\n\n📌 {l_clean}\n\n⚡ <i>Слідкуйте за оновленнями графіків у нашому каналі.</i>"
+                        send_url = f"https://telegram.org{TOKEN}/sendMessage"
+                        requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML"})
+                    last_light_title = l_title
+
         except Exception as e:
-            print(f"Помилка новин: {e}")
-        time.sleep(60)
+            print(f"Помилка побутових новин: {e}")
+            
+        time.sleep(300) # Перевірка побутової інформації раз на 5 хвилин
 
 if __name__ == "__main__":
-    # Запуск веб-сервера проти сну
     web_thread = threading.Thread(target=run_web_server)
     web_thread.daemon = True
     web_thread.start()
     
-    # ТЕСТОВИЙ ЗАПУСК СТАРТУ (Змінні повністю узгоджені)
-    if TOKEN:
-        try:
-            welcome_text = "🚀 <b>Бот успішно активований у хмарі!</b>\n\nАвтоматичний моніторинг повітряних тривог, руху Шахедів/Ракет та головних міських новин для каналу @yoy_lviv_monitor перейшов у цілодобовий режим чергування 24/7."
-            send_url = f"https://telegram.org{TOKEN}/sendMessage"
-            requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": welcome_text, "parse_mode": "HTML"})
-        except Exception as e:
-            print(f"Помилка тесту: {e}")
-
-    # Запуск потоку повітряних тривог
+    # Потік для тривог
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
-    # Запуск новин Львова
-    check_lviv_news()
+    # Потік для щоденної інфи (Погода, Світло)
+    check_daily_utility_info()
