@@ -91,17 +91,19 @@ if __name__ == "__main__":
     web_thread.daemon = True
     web_thread.start()
     
-    # --- ТЕСТОВИЙ РЯДОК ДЛЯ ПЕРЕВІРКИ МІСЬКИХ НОВИН ---
+    # --- НАДМУШЕННЯ ТЕСТУ (ПІСЛЯ ПЕРЕВІРКИ МОЖНА БУДЕ СТЕРТИ) ---
     if TOKEN:
         try:
-            test_news = "📰 <b>НОВИНИ ЛЬВОВА | ТЕСТ ЗВ'ЯЗКУ</b>\n\n📌 У місті все спокійно. Розумний фільтр міських новин успішно підключено до каналу @yoy_lviv_monitor!\n\n📢 <i>Бот готовий публікувати аварійні сповіщення.</i>"
-            requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": test_text, "parse_mode": "HTML"})
-        except:
-            pass
-    # --------------------------------------------------
-    
+            test_text = "🚀 <b>Бот успішно запущений у фоні!</b>\n\nМоніторинг повітряного простору та міських новин для каналу @yoy_lviv_monitor працює 24/7. Чекаємо на оперативні оновлення."
+            send_url = f"https://telegram.org{TOKEN}/sendMessage"
+            requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": test_text, "parse_mode": "HTML"})
+        except Exception as e:
+            print(f"Помилка тесту: {e}")
+    # -----------------------------------------------------------
+
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
     check_lviv_news()
+
