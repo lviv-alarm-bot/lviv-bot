@@ -4,7 +4,8 @@ import threading
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-TOKEN = "9257983302:AAGYlPVE18uIAkwbNeOvDZ0_uQ3L-I77Yss"
+import os
+TOKEN = os.environ.get("TELEGRAM_TOKEN", "9257983302:AAHQogYlePg1cHitvDQ2N8zHp4aR9UWwD4s")
 CHANNEL_ID = "@yoy_lviv_monitor" 
 PS_API_URL = "https://i-scuba.com"
 
