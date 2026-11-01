@@ -24,7 +24,7 @@ def run_web_server():
     server = HTTPServer(('0.0.0.0', port), WebServerHandler)
     server.serve_forever()
 
-# 1. МОНИТОРИНГ УГРОЗ
+# 1. МОНІТОРИНГ ТРИВОГ
 def check_airspace_details():
     last_processed_guid = None
     keywords = ["львів", "львівщин", "стрий", "золочів", "червоноград", "самбір", "броди", "яворів", "західн", "заходу"]
@@ -51,7 +51,7 @@ def check_airspace_details():
             pass
         time.sleep(20)
 
-# 2. МОНИТОРИНГ ГОРОДСКИХ НОВОСТЕЙ
+# 2. МОНІТОРИНГ МІСЬКИХ НОВИН
 def check_lviv_news_loop():
     last_news_title = None
     news_keywords = ["світл", "вод", "відключен", "дтп", "аварі", "транспорт", "опален", "рух"]
@@ -69,7 +69,7 @@ def check_lviv_news_loop():
                     if last_news_title is not None and title != last_news_title:
                         title_lower = title.lower()
                         if any(word in title_lower for word in news_keywords):
-                            clean_title = title.split(" - ")[0]
+                            clean_title = title.split(" - ")
                             news_text = f"📰 <b>НОВИНИ ЛЬВОВА | ОПЕРАТИВНО</b>\n\n📌 {clean_title}"
                             requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
                     last_news_title = title
@@ -77,7 +77,7 @@ def check_lviv_news_loop():
             pass
         time.sleep(60)
 
-# 3. АВТОМАТИЧЕСКИЙ КУРС ВАЛЮТ
+# 3. АВТОМАТИЧНИЙ КУРС ВАЛЮТ
 def check_currency_loop():
     while True:
         try:
@@ -98,13 +98,12 @@ def check_currency_loop():
                         f"🇪🇺 <b>Євро (EUR):</b> <code>{eur_rate} UAH</code>\n\n"
                         f"📢 <i>Моніторинг Львів працює в автономному режимі.</i>"
                     )
-                    # Добавляем инлайн-кнопку для обновления, чтобы пробить фильтр Telegram
                     reply_markup = {"inline_keyboard": [[{"text": "🔄 Оновити дані", "url": "https://bank.gov.ua"}]]}
                     requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": currency_text, "parse_mode": "HTML", "reply_markup": reply_markup})
         except:
             pass
             
-        time.sleep(14400)
+        time.sleep(14400) # Спочатку відправка, потім сон
 
 if __name__ == "__main__":
     web_thread = threading.Thread(target=run_web_server)
@@ -119,4 +118,5 @@ if __name__ == "__main__":
     news_thread.daemon = True
     news_thread.start()
     
+    # Виклик валюти
     check_currency_loop()
