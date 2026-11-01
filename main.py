@@ -87,20 +87,11 @@ if __name__ == "__main__":
     web_thread = threading.Thread(target=run_web_server)
     web_thread.daemon = True
     web_thread.start()
-    
-    # ТЕСТОВИЙ ЗАПУСК (Всі змінні виправлені)
-    if TOKEN:
-        try:
-            welcome_text = "🚀 <b>Бот успішно активований у хмарі!</b>\n\nАвтоматичний моніторинг повітряних тривог, руху Шахедів/Ракет та головних міських новин для каналу @yoy_lviv_monitor перейшов у цілодобовий режим чергування 24/7."
-            send_url = f"https://telegram.org{TOKEN}/sendMessage"
-            requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": welcome_text, "parse_mode": "HTML"})
-        except Exception as e:
-            print(f"Помилка надсилання тесту: {e}")
 
     # Запуск потоку повітряних тривог
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
-    # Запуск новин Львова
+    # Запуск новин Львова у головному потоці
     check_lviv_news()
