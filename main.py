@@ -24,7 +24,7 @@ def run_web_server():
     server = HTTPServer(('0.0.0.0', port), WebServerHandler)
     server.serve_forever()
 
-# 1. МОНІТОРИНГ ТРИВОГ
+# 1. МОНИТОРИНГ УГРОЗ
 def check_airspace_details():
     last_processed_guid = None
     keywords = ["львів", "львівщин", "стрий", "золочів", "червоноград", "самбір", "броди", "яворів", "західн", "заходу"]
@@ -44,13 +44,14 @@ def check_airspace_details():
                         text_to_check = description.lower()
                         if any(word in text_to_check for word in keywords):
                             bot_text = f"⚠️ <b>ОПЕРАТИВНА ІНФОРМАЦІЯ ПРО РУХ ЦІЛЕЙ:</b>\n\n📌 {description}"
-                            requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML"})
+                            reply_markup = {"inline_keyboard": [[{"text": "🗺️ Відкрити радарну мапу DIMAP", "url": "https://t.me"}]]}
+                            requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML", "reply_markup": reply_markup})
                     last_processed_guid = guid
         except:
             pass
         time.sleep(20)
 
-# 2. МОНІТОРИНГ МІСЬКИХ НОВИН
+# 2. МОНИТОРИНГ ГОРОДСКИХ НОВОСТЕЙ
 def check_lviv_news_loop():
     last_news_title = None
     news_keywords = ["світл", "вод", "відключен", "дтп", "аварі", "транспорт", "опален", "рух"]
@@ -68,7 +69,7 @@ def check_lviv_news_loop():
                     if last_news_title is not None and title != last_news_title:
                         title_lower = title.lower()
                         if any(word in title_lower for word in news_keywords):
-                            clean_title = title.split(" - ")
+                            clean_title = title.split(" - ")[0]
                             news_text = f"📰 <b>НОВИНИ ЛЬВОВА | ОПЕРАТИВНО</b>\n\n📌 {clean_title}"
                             requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
                     last_news_title = title
@@ -76,7 +77,7 @@ def check_lviv_news_loop():
             pass
         time.sleep(60)
 
-# 3. АВТОМАТИЧНИЙ КУРС ВАЛЮТ
+# 3. АВТОМАТИЧЕСКИЙ КУРС ВАЛЮТ
 def check_currency_loop():
     while True:
         try:
@@ -92,17 +93,18 @@ def check_currency_loop():
                             eur_rate = round(float(item.get("rate")), 2)
                     
                     currency_text = (
-                        f"💵 <b>ОФІЦІЙНИЙ КУРС ВАЛЮТ (НБУ):</b>\n\n"
-                        f"🇺🇸 <b>Долар (USD):</b> {usd_rate} грн\n"
-                        f"🇪🇺 <b>Євро (EUR):</b> {eur_rate} грн\n\n"
-                        f"📊 <i>Оновлення курсу працює в автоматичному режимі.</i>"
+                        f"📊 <b>КУРС ВАЛЮТ НА СЬОГОДНІ (НБУ):</b>\n\n"
+                        f"🇺🇸 <b>Долар (USD):</b> <code>{usd_rate} UAH</code>\n"
+                        f"🇪🇺 <b>Євро (EUR):</b> <code>{eur_rate} UAH</code>\n\n"
+                        f"📢 <i>Моніторинг Львів працює в автономному режимі.</i>"
                     )
-                    # МИТТЄВА ВІДПРАВКА БЕЗ ЗАТРИМОК:
-                    requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": currency_text, "parse_mode": "HTML"})
+                    # Добавляем инлайн-кнопку для обновления, чтобы пробить фильтр Telegram
+                    reply_markup = {"inline_keyboard": [[{"text": "🔄 Оновити дані", "url": "https://bank.gov.ua"}]]}
+                    requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": currency_text, "parse_mode": "HTML", "reply_markup": reply_markup})
         except:
             pass
             
-        time.sleep(14400) # Заснути на 4 години ПІСЛЯ відправки
+        time.sleep(14400)
 
 if __name__ == "__main__":
     web_thread = threading.Thread(target=run_web_server)
@@ -117,6 +119,4 @@ if __name__ == "__main__":
     news_thread.daemon = True
     news_thread.start()
     
-    # Запускаємо валюту
     check_currency_loop()
-
