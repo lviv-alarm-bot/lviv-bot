@@ -8,9 +8,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHANNEL_ID = "@yoy_lviv_monitor" 
 
-# ИСТОЧНИКИ ДАННЫХ
-PS_API_URL = "https://i-scuba.com" # Воздушные Силы
-LVIV_NEWS_URL = "https://google.com" # Новости Львова
+# ДЖЕРЕЛА ДАНИХ
+PS_API_URL = "https://i-scuba.com" # Повітряні Сили
+LVIV_NEWS_URL = "https://google.com" # Новини Львова
 
 class WebServerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -24,7 +24,7 @@ def run_web_server():
     server = HTTPServer(('0.0.0.0', port), WebServerHandler)
     server.serve_forever()
 
-# 1. МОНИТОРИНГ РАКЕТ И ШАХЕДОВ
+# 1. МОНІТОРИНГ РАКЕТ І ШАХЕДІВ
 def check_airspace_details():
     last_processed_guid = None
     keywords = ["львів", "львівщин", "стрий", "золочів", "червоноград", "самбір", "броди", "яворів", "західн", "заходу"]
@@ -50,10 +50,10 @@ def check_airspace_details():
                             requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML"})
                     last_processed_guid = guid
         except Exception as e:
-            print(f"Ошибка ПС ЗСУ: {e}")
+            print(f"Помилка ПС ЗСУ: {e}")
         time.sleep(20)
 
-# 2. МОНИТОРИНГ ГОРОДСКИХ НОВОСТЕЙ
+# 2. МОНІТОРИНГ МІСЬКИХ НОВИН
 def check_lviv_news():
     last_news_title = None
     news_keywords = ["світл", "вод", "відключен", "дтп", "аварі", "транспорт", "опален", "рух"]
@@ -79,7 +79,7 @@ def check_lviv_news():
                             requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
                     last_news_title = title
         except Exception as e:
-            print(f"Ошибка новостей: {e}")
+            print(f"Помилка новин: {e}")
         time.sleep(60)
 
 if __name__ == "__main__":
@@ -88,24 +88,19 @@ if __name__ == "__main__":
     web_thread.daemon = True
     web_thread.start()
     
-    # ПРИНУДИТЕЛЬНЫЙ СТАРТОВЫЙ ТЕСТ СВЯЗИ (Точный и выверенный)
+    # ТЕСТОВИЙ ЗАПУСК (Всі змінні виправлені)
     if TOKEN:
         try:
             welcome_text = "🚀 <b>Бот успішно активований у хмарі!</b>\n\nАвтоматичний моніторинг повітряних тривог, руху Шахедів/Ракет та головних міських новин для каналу @yoy_lviv_monitor перейшов у цілодобовий режим чергування 24/7."
             send_url = f"https://telegram.org{TOKEN}/sendMessage"
             requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": welcome_text, "parse_mode": "HTML"})
         except Exception as e:
-            print(f"Помилка тесту: {e}")
+            print(f"Помилка надсилання тесту: {e}")
 
-    # Запуск потока для воздушных тревог
+    # Запуск потоку повітряних тривог
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
-    # Запуск мониторинга новостей в основном потоке
+    # Запуск новин Львова
     check_lviv_news()
-
-
-    # Запуск мониторинга новостей в основном потоке
-    check_lviv_news()
-
