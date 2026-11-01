@@ -1,11 +1,12 @@
+import os
 import time
 import requests
 import threading
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-import os
-TOKEN = os.environ.get("TELEGRAM_TOKEN", "9257983302:AAHQogYlePg1cHitvDQ2N8zHp4aR9UWwD4s")
+# ЧИТАЄМО ТОКЕН ВИКЛЮЧНО З НАЛАШТУВАНЬ СЕРВЕРА (RENDER ENVIRONMENT)
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHANNEL_ID = "@yoy_lviv_monitor" 
 PS_API_URL = "https://i-scuba.com"
 
@@ -17,7 +18,6 @@ class WebServerHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"Bot is active and monitoring airspace!")
 
 def run_web_server():
-    import os
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), WebServerHandler)
     server.serve_forever()
@@ -29,6 +29,11 @@ def check_airspace_details():
     
     while True:
         try:
+            if not TOKEN:
+                print("Помилка: TELEGRAM_TOKEN не знайдено в налаштуваннях Environment на Render!")
+                time.sleep(30)
+                continue
+
             response = requests.get(PS_API_URL, timeout=15)
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
@@ -52,15 +57,19 @@ def check_airspace_details():
         time.sleep(20)
 
 if __name__ == "__main__":
+    # Запуск веб-сайту для запобігання сну
     web_thread = threading.Thread(target=run_web_server)
     web_thread.daemon = True
     web_thread.start()
     
-    # Виправлений формат відправки тесту (тепер у форматі HTML):
-    try:
-        test_text = "🔄 <b>Систему моніторингу оновлено!</b>\n\nТепер бот автоматично відстежуватиме напрямок руху Шахедів/Ракет та публікуватиме деталі, як тільки вони з'являться на підльоті до Львівщини."
-        requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": test_text, "parse_mode": "HTML"})
-    except:
-        pass
+    # Одноразовий жорсткий тест зв'язку з Telegram-каналом під час запуску
+    if TOKEN:
+        try:
+            test_text = "🔄 <b>Систему моніторингу активовано!</b>\n\nБот успішно підключився до каналу. Тепер сповіщення про рух Шахедів та Ракет на підльоті до Львівщини публікуватимуться автоматично 24/7."
+            send_url = f"https://telegram.org{TOKEN}/sendMessage"
+            res = requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": test_text, "parse_mode": "HTML"})
+            print("Спроба відправки тесту. Статус відповіді Telegram:", res.status_code)
+        except Exception as e:
+            print(f"Не вдалося відправити тест: {e}")
         
     check_airspace_details()
