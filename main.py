@@ -83,25 +83,28 @@ def check_lviv_news():
         time.sleep(60)
 
 if __name__ == "__main__":
-    # Запуск веб-сервера против сна
+    # Запуск веб-сервера проти сну
     web_thread = threading.Thread(target=run_web_server)
     web_thread.daemon = True
     web_thread.start()
     
-    # ПРИНУДИТЕЛЬНЫЙ СТАРТОВЫЙ ТЕСТ ЗВЯЗИ (Исправленный)
+    # ПРИНУДИТЕЛЬНЫЙ СТАРТОВЫЙ ТЕСТ СВЯЗИ (Точный и выверенный)
     if TOKEN:
         try:
             welcome_text = "🚀 <b>Бот успішно активований у хмарі!</b>\n\nАвтоматичний моніторинг повітряних тривог, руху Шахедів/Ракет та головних міських новин для каналу @yoy_lviv_monitor перейшов у цілодобовий режим чергування 24/7."
             send_url = f"https://telegram.org{TOKEN}/sendMessage"
             requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": welcome_text, "parse_mode": "HTML"})
-        except:
-            pass
+        except Exception as e:
+            print(f"Помилка тесту: {e}")
 
     # Запуск потока для воздушных тревог
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
+    # Запуск мониторинга новостей в основном потоке
+    check_lviv_news()
+
     # Запуск мониторинга новостей в основном потоке
     check_lviv_news()
 
