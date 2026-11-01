@@ -5,7 +5,8 @@ TOKEN = "9257983302:AAGYlPVE18uIAkwbNeOvDZ0_uQ3L-I77Yss"
 CHANNEL_ID = "@yoy_lviv_monitor" 
 REGION_ID = "14" # ID Львівської області
 
-API_URL = "https://ubilling.net.ua"
+# ТУТ ПРАВИЛЬНЕ ПОСИЛАННЯ:
+API_URL = "https://ubilling.net.ua/aerialalerts/?json=true"
 
 def check_alarm():
     last_state = None
@@ -24,6 +25,7 @@ def check_alarm():
                     else:
                         text = "🟢 **ВІДБІЙ ПОВІТРЯНОЇ TРИВОГИ у Львівській області.**\n\nНебезпека минула. Дякуємо Силам ППО!"
                     
+                    # ТУТ ТАКОЖ ПРАВИЛЬНЕ ПОСИЛАННЯ ТЕЛЕГРАМУ:
                     send_url = f"https://telegram.org{TOKEN}/sendMessage"
                     requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": text, "parse_mode": "Markdown"})
                 
