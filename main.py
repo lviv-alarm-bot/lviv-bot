@@ -60,5 +60,11 @@ if __name__ == "__main__":
     web_thread.daemon = True
     web_thread.start()
     
+    # Тестове повідомлення для перевірки каналу:
+    try:
+        requests.post(f"https://telegram.org", json={"chat_id": "@yoy_lviv_monitor", "text": "🚀 **Моніторинг успішно підключено!**\n\nБот @moya_tryvoga_lviv_bot перейшов у режим цілодобового чергування. Система готова сповіщати про тривоги та відбої на Львівщині.", "parse_mode": "Markdown"})
+    except Exception as e:
+        print(f"Помилка тесту: {e}")
+    
     # Запускаємо самого бота
     check_alarm()
