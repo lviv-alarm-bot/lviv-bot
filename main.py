@@ -73,7 +73,7 @@ def check_lviv_news():
                     if last_news_title is not None and title != last_news_title:
                         title_lower = title.lower()
                         if any(word in title_lower for word in news_keywords):
-                            clean_title = title.split(" - ")[0]
+                            clean_title = title.split(" - ")
                             news_text = f"📰 <b>НОВИНИ ЛЬВОВА | ОПЕРАТИВНО</b>\n\n📌 {clean_title}\n\n📢 <i>Поділіться інформацією з близькими!</i>"
                             send_url = f"https://telegram.org{TOKEN}/sendMessage"
                             requests.post(send_url, json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     web_thread.daemon = True
     web_thread.start()
     
-    # ТЕСТОВИЙ ЗАПУСК СТАРТУ (Змінні виправлені)
+    # ТЕСТОВИЙ ЗАПУСК СТАРТУ (Змінні повністю узгоджені)
     if TOKEN:
         try:
             welcome_text = "🚀 <b>Бот успішно активований у хмарі!</b>\n\nАвтоматичний моніторинг повітряних тривог, руху Шахедів/Ракет та головних міських новин для каналу @yoy_lviv_monitor перейшов у цілодобовий режим чергування 24/7."
