@@ -91,10 +91,17 @@ if __name__ == "__main__":
     web_thread.daemon = True
     web_thread.start()
     
-    # Потік для воєнних тривог
+    # --- ТЕСТОВИЙ РЯДОК ДЛЯ ПЕРЕВІРКИ МІСЬКИХ НОВИН ---
+    if TOKEN:
+        try:
+            test_news = "📰 <b>НОВИНИ ЛЬВОВА | ТЕСТ ЗВ'ЯЗКУ</b>\n\n📌 У місті все спокійно. Розумний фільтр міських новин успішно підключено до каналу @yoy_lviv_monitor!\n\n📢 <i>Бот готовий публікувати аварійні сповіщення.</i>"
+            requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": test_text, "parse_mode": "HTML"})
+        except:
+            pass
+    # --------------------------------------------------
+    
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
-    # Потік для міських новин
     check_lviv_news()
