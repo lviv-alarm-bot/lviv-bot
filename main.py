@@ -28,7 +28,6 @@ def run_web_server():
 def check_airspace_details():
     last_processed_guid = None
     keywords = ["львів", "львівщин", "стрий", "золочів", "червоноград", "самбір", "броди", "яворів", "західн", "заходу"]
-    print("Потік моніторингу загрози Шахедів запущено...")
     while True:
         try:
             if not TOKEN:
@@ -47,15 +46,14 @@ def check_airspace_details():
                             bot_text = f"⚠️ <b>ОПЕРАТИВНА ІНФОРМАЦІЯ ПРО РУХ ЦІЛЕЙ:</b>\n\n📌 {description}"
                             requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML"})
                     last_processed_guid = guid
-        except Exception as e:
-            print(f"Помилка ПС ЗСУ: {e}")
+        except:
+            pass
         time.sleep(20)
 
 # 2. МОНІТОРИНГ МІСЬКИХ НОВИН
 def check_lviv_news_loop():
     last_news_title = None
     news_keywords = ["світл", "вод", "відключен", "дтп", "аварі", "транспорт", "опален", "рух"]
-    print("Потік міських новин Львова запущено...")
     while True:
         try:
             if not TOKEN:
@@ -70,17 +68,16 @@ def check_lviv_news_loop():
                     if last_news_title is not None and title != last_news_title:
                         title_lower = title.lower()
                         if any(word in title_lower for word in news_keywords):
-                            clean_title = title.split(" - ")[0]
+                            clean_title = title.split(" - ")
                             news_text = f"📰 <b>НОВИНИ ЛЬВОВА | ОПЕРАТИВНО</b>\n\n📌 {clean_title}"
                             requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
                     last_news_title = title
-        except Exception as e:
-            print(f"Помилка новин: {e}")
+        except:
+            pass
         time.sleep(60)
 
 # 3. АВТОМАТИЧНИЙ КУРС ВАЛЮТ
 def check_currency_loop():
-    print("Потік курсу валют НБУ активовано...")
     while True:
         try:
             if TOKEN:
@@ -100,29 +97,26 @@ def check_currency_loop():
                         f"🇪🇺 <b>Євро (EUR):</b> {eur_rate} грн\n\n"
                         f"📊 <i>Оновлення курсу працює в автоматичному режимі.</i>"
                     )
-                    telegram_res = requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": currency_text, "parse_mode": "HTML"})
-                    print(f"Спроба відправки валюти. Статус відповіді Telegram API: {telegram_res.status_code}")
-        except Exception as e:
-            print(f"Помилка валюти: {e}")
+                    # МИТТЄВА ВІДПРАВКА БЕЗ ЗАТРИМОК:
+                    requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": currency_text, "parse_mode": "HTML"})
+        except:
+            pass
             
-        time.sleep(14400) # Кожні 4 години
+        time.sleep(14400) # Заснути на 4 години ПІСЛЯ відправки
 
 if __name__ == "__main__":
-    # Запуск веб-сервера
     web_thread = threading.Thread(target=run_web_server)
     web_thread.daemon = True
     web_thread.start()
 
-    # Запуск потоку повітряних тривог
     airspace_thread = threading.Thread(target=check_airspace_details)
     airspace_thread.daemon = True
     airspace_thread.start()
     
-    # Запуск потоку новин
     news_thread = threading.Thread(target=check_lviv_news_loop)
     news_thread.daemon = True
     news_thread.start()
     
-    # Запуск валюти в основному потоці, щоб вона спрацювала першою
+    # Запускаємо валюту
     check_currency_loop()
 
