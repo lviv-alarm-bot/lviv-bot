@@ -1,122 +1,82 @@
 import os
 import time
 import requests
-import threading
-import xml.etree.ElementTree as ET
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from flask import Flask, jsonify
+from threading import Thread
 
-TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHANNEL_ID = "@yoy_lviv_monitor" 
+# 1. Налаштування Flask-сервера, щоб Render бачив "Web Service"
+app = Flask('')
 
-PS_API_URL = "https://i-scuba.com"
-LVIV_NEWS_URL = "https://google.com"
-CURRENCY_API_URL = "https://bank.gov.ua"
+@app.route('/')
+def home():
+    return "Бот моніторингу працює!", 200
 
-class WebServerHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(b"Active Bot is running!")
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"}), 200
 
-def run_web_server():
+def run_server():
+    # Render автоматично передає порт у змінну оточення PORT
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), WebServerHandler)
-    server.serve_forever()
+    app.run(host='0.0.0.0', port=port)
 
-# 1. МОНІТОРИНГ ТРИВОГ
-def check_airspace_details():
-    last_processed_guid = None
-    keywords = ["львів", "львівщин", "стрий", "золочів", "червоноград", "самбір", "броди", "яворів", "західн", "заходу"]
-    while True:
-        try:
-            if not TOKEN:
-                time.sleep(5)
-                continue
-            response = requests.get(PS_API_URL, timeout=15)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                latest_item = root.find(".//item")
-                if latest_item is not None:
-                    guid = latest_item.find("guid").text
-                    description = latest_item.find("description").text if latest_item.find("description") is not None else latest_item.find("title").text
-                    if last_processed_guid is not None and guid != last_processed_guid:
-                        text_to_check = description.lower()
-                        if any(word in text_to_check for word in keywords):
-                            bot_text = f"⚠️ <b>ОПЕРАТИВНА ІНФОРМАЦІЯ ПРО РУХ ЦІЛЕЙ:</b>\n\n📌 {description}"
-                            reply_markup = {"inline_keyboard": [[{"text": "🗺️ Відкрити радарну мапу DIMAP", "url": "https://t.me"}]]}
-                            requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": bot_text, "parse_mode": "HTML", "reply_markup": reply_markup})
-                    last_processed_guid = guid
-        except:
-            pass
-        time.sleep(20)
+# 2. Логіка моніторингу тривог DiMap
+TOKEN = "9257983302:AAEbmL_VjbpITwCznZzRlnMXnItn8rL1QBM"
+CHANNEL_ID = "@yoy_lviv_monitor"
+API_URL = "https://ubilling.net.ua/aerialalerts/?json=true" # або міняйте на https://dimap.live
 
-# 2. МОНІТОРИНГ МІСЬКИХ НОВИН
-def check_lviv_news_loop():
-    last_news_title = None
-    news_keywords = ["світл", "вод", "відключен", "дтп", "аварі", "транспорт", "опален", "рух"]
-    while True:
-        try:
-            if not TOKEN:
-                time.sleep(5)
-                continue
-            response = requests.get(LVIV_NEWS_URL, timeout=15)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                latest_item = root.find(".//item")
-                if latest_item is not None:
-                    title = latest_item.find("title").text
-                    if last_news_title is not None and title != last_news_title:
-                        title_lower = title.lower()
-                        if any(word in title_lower for word in news_keywords):
-                            clean_title = title.split(" - ")
-                            news_text = f"📰 <b>НОВИНИ ЛЬВОВА | ОПЕРАТИВНО</b>\n\n📌 {clean_title}"
-                            requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": news_text, "parse_mode": "HTML"})
-                    last_news_title = title
-        except:
-            pass
-        time.sleep(60)
+TARGET_REGIONS = ["Львів", "Львівська", "Львівський"]
+current_alerts = {region: False for region in TARGET_REGIONS}
 
-# 3. АВТОМАТИЧНИЙ КУРС ВАЛЮТ
-def check_currency_loop():
-    while True:
-        try:
-            if TOKEN:
-                res = requests.get(CURRENCY_API_URL, timeout=10)
-                if res.status_code == 200:
-                    data = res.json()
-                    usd_rate, eur_rate = 0, 0
-                    for item in data:
-                        if item.get("cc") == "USD":
-                            usd_rate = round(float(item.get("rate")), 2)
-                        if item.get("cc") == "EUR":
-                            eur_rate = round(float(item.get("rate")), 2)
-                    
-                    currency_text = (
-                        f"📊 <b>КУРС ВАЛЮТ НА СЬОГОДНІ (НБУ):</b>\n\n"
-                        f"🇺🇸 <b>Долар (USD):</b> <code>{usd_rate} UAH</code>\n"
-                        f"🇪🇺 <b>Євро (EUR):</b> <code>{eur_rate} UAH</code>\n\n"
-                        f"📢 <i>Моніторинг Львів працює в автономному режимі.</i>"
-                    )
-                    reply_markup = {"inline_keyboard": [[{"text": "🔄 Оновити дані", "url": "https://bank.gov.ua"}]]}
-                    requests.post(f"https://telegram.org{TOKEN}/sendMessage", json={"chat_id": CHANNEL_ID, "text": currency_text, "parse_mode": "HTML", "reply_markup": reply_markup})
-        except:
-            pass
+def send_telegram_message(text):
+    url = f"https://telegram.org{TOKEN}/sendMessage"
+    payload = {"chat_id": CHANNEL_ID, "text": text, "parse_mode": "Markdown"}
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        print(f"Помилка Telegram: {e}")
+
+def check_alerts():
+    global current_alerts
+    try:
+        response = requests.get(API_URL, timeout=10)
+        if response.status_code != 200:
+            return
+        
+        json_data = response.json()
+        active_alerts = json_data.get("alerts", [])
+        
+        # Збираємо регіони з червоним статусом тривоги
+        regions_with_red_alert = []
+        for alert in active_alerts:
+            if alert.get("color") == "red" and alert.get("alertType") == "air":
+                regions_with_red_alert.append(alert.get("region", ""))
+        
+        for target in TARGET_REGIONS:
+            is_active_now = any(target in active_reg for active_reg in regions_with_red_alert)
             
-        time.sleep(14400) # Спочатку відправка, потім сон
+            if is_active_now and not current_alerts[target]:
+                current_alerts[target] = True
+                send_telegram_message(f"🔴 *🚨 ПОВІТРЯНА ТРИВОГА на Львівщині!* \n\n📍 Регіон: *{target}*\n⚠️ Негайно прямуйте в укриття!")
+                
+            elif not is_active_now and current_alerts[target]:
+                current_alerts[target] = False
+                send_telegram_message(f"🟢 *✅ ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ!* \n\n📍 Регіон: *{target}*\n👍 Можна залишати укриття.")
+    except Exception as e:
+        print(f"Помилка моніторингу: {e}")
 
+def monitor_loop():
+    print("🚀 Цикл моніторингу DiMap запущено...")
+    while True:
+        check_alerts()
+        time.sleep(20) # Опитування кожні 20 секунд
+
+# 3. Головний запуск
 if __name__ == "__main__":
-    web_thread = threading.Thread(target=run_web_server)
-    web_thread.daemon = True
-    web_thread.start()
-
-    airspace_thread = threading.Thread(target=check_airspace_details)
-    airspace_thread.daemon = True
-    airspace_thread.start()
+    # Запускаємо веб-сервер у фоновому потоці
+    server_thread = Thread(target=run_server)
+    server_thread.daemon = True
+    server_thread.start()
     
-    news_thread = threading.Thread(target=check_lviv_news_loop)
-    news_thread.daemon = True
-    news_thread.start()
-    
-    # Виклик валюти
-    check_currency_loop()
+    # Запускаємо моніторинг у головному потоці
+    monitor_loop()
